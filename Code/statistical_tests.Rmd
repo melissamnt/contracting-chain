@@ -1,0 +1,470 @@
+---
+title: "Statistical tests"
+output: html_notebook
+---
+Cargar df y librerias
+```{r}
+library(ggplot2)
+library(dplyr)
+library(plotly)
+library(reshape2)
+
+setwd("C:/Users/melis/OneDrive/Documentos/Corrupcion/Codigo/Algoritmo")
+
+df_all <- read.csv2(file="CI_INVIAS_all_f.csv",head=TRUE,sep="\t", dec=",")
+df_test <- read.csv2(file="CI_INVIAS_test.csv",head=TRUE,sep="\t", dec=",")
+t1_all <- read.csv2(file="t_INVIAS1_all.csv",head=TRUE,sep="\t", dec=",")
+t2_all <- read.csv2(file="t_INVIAS2_all.csv",head=TRUE,sep="\t", dec=",")
+t1_cos <- read.csv2(file="t_INVIAS1_cosine.csv",head=TRUE,sep="\t", dec=",")
+t2_cos <- read.csv2(file="t_INVIAS2_cosine.csv",head=TRUE,sep="\t", dec=",")
+t1_edit <- read.csv2(file="t_INVIAS1_edit.csv",head=TRUE,sep="\t", dec=",")
+t2_edit <-  read.csv2(file="t_INVIAS2_edit.csv",head=TRUE,sep="\t", dec=",")
+t_ngrams <-  read.csv2(file="ngrams/t_ngrams.txt",head=TRUE,sep="\t", dec=",")
+t_mun <-  read.csv2(file="time_iteration.csv",head=TRUE,sep="\t", dec=".")
+t_mun_e <-  read.csv2(file="time_iteration_e.csv",head=TRUE,sep="\t", dec=".")
+cos_val <-  read.csv2(file="validation/cos_val.txt",head=TRUE,sep="\t", dec=",")
+edit_val <-  read.csv2(file="validation/edit_val.txt",head=TRUE,sep="\t", dec=",")
+asm_scores <-  read.csv2(file="validation/asm_scores.txt",head=TRUE,sep="\t", dec=",")
+
+df_test$X <- NULL
+df_all$X <- NULL
+df_all$Column1 <- NULL
+```
+
+
+*Análisis estadístico*
+
+*Muestra ya calculada*
+Boxplot graficando los puntajes vs. si es parte de la muestra o no.
+```{r}
+df_all$muestra = factor(df_all$muestra)
+df_all$score <-  as.numeric(df_all$score)
+df_all$characters <-  as.numeric(df_all$characters)
+df_test$score <-  as.numeric(df_test$score)
+
+ggplot(df_all, aes(muestra,characters))+geom_boxplot(aes(col=muestra))+
+  theme(panel.background = element_rect(fill = "white", colour = "grey50"), legend.position = c(0.08, 0.85), legend.background = element_rect(size=0.5, linetype="solid", 
+                                  colour ="black"),
+        axis.text=element_text(size=10),
+        axis.title=element_text(size=12))+
+  xlab('Sample') +
+  ylab('Number of characters\n in purpose of the agreement') + 
+  labs(fill = "Sample")
+
+ggplot(df_all, aes(muestra,characters)) +
+        geom_boxplot(alpha=0.7) +
+        scale_y_continuous(name = "Number of characters\n in purpose of the agreement") +
+        scale_x_discrete(name = "Sample") +
+        theme(panel.background = element_rect(fill = "white", colour = "grey50"), legend.position =    c(0.08, 0.15), legend.background = element_rect(size=0.5, linetype="solid", 
+                                  colour ="black"),
+        axis.text=element_text(size=10),
+        axis.title=element_text(size=12)) +
+        scale_fill_brewer(palette = "Accent")+
+        labs(fill = "Sample")
+
+ggsave("bp_sample.pdf", device = "pdf")
+
+ggplot(df_all, aes(muestra,characters))+geom_boxplot(aes(col=muestra), outlier.shape = NA)+
+  theme(panel.background = element_rect(fill = "white", colour = "grey50"), legend.position = c(0.08, 0.85), legend.background = element_rect(size=0.5, linetype="solid", 
+                                  colour ="black"),
+        axis.text=element_text(size=10),
+        axis.title=element_text(size=12),text = element_text(size=14))+
+  xlab('Sample') +
+  ylab('Number of characters\n in purpose of the agreement') + 
+  labs(fill = "Sample")+ 
+  scale_y_continuous(limits = quantile(df_all$characters, c(0.1, 0.9)))+
+        scale_fill_brewer(palette = "Accent")
+
+
+ggplot(df_all, aes(muestra,characters)) +
+        geom_boxplot(alpha=0.7) +
+        scale_y_continuous(name = "Number of characters\n in purpose of the agreement") +
+        scale_x_discrete(name = "Sample") +
+        theme(panel.background = element_rect(fill = "white", colour = "grey50"), legend.position =    c(0.08, 0.15), legend.background = element_rect(size=0.5, linetype="solid", 
+                                  colour ="black"),
+        axis.text=element_text(size=10),
+        axis.title=element_text(size=12)) +
+        labs(fill = "Sample")+ 
+  scale_y_continuous(limits = quantile(df_all$characters, c(0.1, 0.9)))+
+        scale_fill_brewer(palette = "Accent") +
+  ylab('Number of characters\n in purpose of the agreement') 
+
+ggsave("bp_samplenout.pdf", device = "pdf")
+
+
+
+```
+
+Regresion Lineal scores agrupado por muestra
+```{r}
+df_all.mod1 = lm(characters ~ muestra, data = df_all)
+summary(df_all.mod1)
+```
+
+ANOVA de score agrupado por Muestra (V/F)
+```{r}
+aov <- anova(df_all.mod1)
+```
+
+
+Kruskal-Wallis rank sum test muestra vs poblacion, número de caracteres en cada frase. 
+```{r}
+kruskal.test(characters ~ muestra, data = df_all)
+```
+Prueba de hetereoceasticidad
+```{r}
+library(lmtest)
+bptest(characters ~ muestra, data = df_all)
+```
+
+Grafica de residuales
+```{r}
+qqnorm(resid(df_all.mod1)) #A density plot
+```
+
+
+Generar tabla para LateX
+```{r}
+library(xtable)
+xtable(anova(df_all.mod1))
+```
+
+Gráficas con histograma y distribución de los characters (muestra y población)
+
+```{r}
+ggplot(data=df_all[df_all$muestra == "False",], aes(df_all[df_all$muestra == "False",]$characters)) + 
+  geom_histogram(aes(y =..density..), 
+                 breaks=seq(0, max(df_all[df_all$muestra == "False",]$characters), by = 10), 
+                 col="red", 
+                 fill="green", 
+                 alpha = .2) + 
+  geom_density(col=2) + 
+  labs(title="Histogram for Number of Characters (Population)") +
+  labs(x="Characters", y="Count")
+
+ggplot(data=df_all[df_all$muestra == "True",], aes(df_all[df_all$muestra == "True",]$characters)) + 
+  geom_histogram(aes(y =..density..), 
+                 breaks=seq(0, max(df_all[df_all$muestra == "True",]$characters), by = 10), 
+                 col="red", 
+                 fill="green", 
+                 alpha = .2) + 
+  geom_density(col=2) + 
+  labs(title="Histogram for Number of Characters (Sample)") +
+  labs(x="Characters", y="Count")
+
+```
+
+
+# Complete dataset
+
+Determinar el primer y el segundo contrato
+
+
+```{r, echo=FALSE}
+
+df_all$first <- NA
+for (i in unique(df_all$duplicated)){
+  maxim <- max(df_all$score[df_all$duplicated == i])
+  if (is.na(maxim)) next
+ df_all$first[df_all$duplicated == i && df_all$score == maxim] <- T
+ df_all$first[df_all$duplicated == i && df_all$score != maxim] <- F
+}
+
+
+```
+
+Un resumen estadistico de los scores de los contratos:
+
+```{r, echo=FALSE}
+summary(df_all$score)
+```
+
+Una distribuciÃ³n de los valores por percentiles:
+
+```{r, echo=FALSE}
+q = seq(0,1,0.1)
+data.frame(Valor = quantile(df_all$score, probs = q, na.rm = T))
+```
+
+
+La distribucion de los scores.
+
+```{r, echo=FALSE}
+x <- df_all
+hchist(x$score) %>% 
+  hc_title(text = 'Disbribucion de los scores',
+           style = list(color = "skyBlue", useHTML = TRUE)) 
+
+```
+
+La densidad de los scores.
+
+```{r, echo=FALSE}
+
+x <- df_all %>% 
+  filter(!is.na(score)) %>% 
+  select(score)
+
+hchart(density(x$score), type= 'area') %>% 
+  hc_title(text = 'Densidad de los scores',
+           style = list(color = "skyBlue", useHTML = TRUE)) 
+
+```
+
+# Tiempos
+
+Un resumen estadistico del tiempo total de ejecución de los algoritmos:
+
+```{r, echo=FALSE}
+t2_all$total <- t2_all$token + t2_all$matrix + t2_all$printdb 
+summary(t2_all$total)
+```
+
+Una distribucion de los valores por percentiles:
+
+```{r, echo=FALSE}
+q = seq(0,1,0.1)
+data.frame(Valor = quantile(t2_all$total, probs = q))
+```
+
+
+La distribucion de los tiempos de ejecución, excluyendo los que se encuentran por encima del 95 percentil y por debajo del 5 percentil:
+
+```{r, echo=FALSE}
+inf <- c(0.05)
+sup <- c(0.95)
+
+x <- t2_all %>% 
+  filter(total > quantile(t2_all$total, inf) &
+         total < quantile(t2_all$total, sup)) %>% 
+  select(total)
+
+hchist(x$total) %>% 
+  hc_title(text = 'DisbribuciÃ³n de los tiempos de ejecucion',
+           style = list(color = "skyBlue", useHTML = TRUE)) 
+```
+
+La densidad de la cuantia de los contratos, excluyendo los que se encuentran por encima del 95 percentil y por debajo del 5 percentil:
+
+```{r, echo=FALSE}
+inf <- c(0.05)
+sup <- c(0.95)
+
+x <- t2_all %>% 
+  filter(total > quantile(t2_all$total, inf) &
+         total < quantile(t2_all$total, sup)) %>% 
+  select(total)
+
+hchart(density(x$total), type= 'area') %>% 
+  hc_title(text = 'Densidad de la cuantia de los contratos',
+           style = list(color = "skyBlue", useHTML = TRUE)) 
+
+```
+
+
+
+*Comparación de puntajes cosine vs edit distance*
+ 
+Boxplot
+```{r}
+
+library(RColorBrewer)
+
+asm_val1 <- data.frame(cos=double(),
+                       edit=double())[1:length(cos_val$score1), ] 
+asm_val1$cos <- cos_val$score1
+edit_val1 <- edit_val[-nrow(edit_val),]
+asm_val1$edit <- edit_val1$score1_nor
+asm_val_g1<- melt(asm_val1)
+asm_val_g1$id <- "1st Contract"
+
+asm_val2 <- data.frame(cos=double(),
+                       edit=double())[1:length(cos_val$score2), ] 
+asm_val2$cos <- cos_val$score2
+asm_val2$edit <- edit_val1$score2_nor
+asm_val_g2<- melt(asm_val2)
+asm_val_g2$id <- "2nd Contract"
+
+asm_val_g <- rbind(asm_val_g1, asm_val_g2)
+
+
+p10 <- ggplot(asm_val_g, aes(x = id, y = value, fill = variable)) +
+        geom_boxplot(alpha=0.7) +
+        scale_y_continuous(name = "Score") +
+        scale_x_discrete(name = "Contract") +
+        theme(panel.background = element_rect(fill = "white", colour = "grey50"), legend.position =    c(0.08, 0.15), legend.background = element_rect(size=0.5, linetype="solid", 
+                                  colour ="black"),
+        axis.text=element_text(size=10),
+        axis.title=element_text(size=12)) +
+        scale_fill_brewer(palette = "Accent")+
+        labs(fill = "Method")
+p10
+ggsave("scores_asm.pdf", device = "pdf")
+
+
+```
+
+Plotting scores (scatter plot)
+```{r}
+ggplot(asm_scores, aes(score1, score2)) + 
+  geom_point(aes(colour = factor(asm))) + 
+  theme(panel.background = element_rect(fill = "white", colour = "grey50"), legend.position = c(0.08, 0.85), legend.background = element_rect(size=0.5, linetype="solid", 
+                                  colour ="black"),
+        axis.text=element_text(size=10),
+        axis.title=element_text(size=12))+
+  xlab('Score first contract') +
+  ylab('Score second contract') +
+  scale_colour_discrete(name="Method",
+                         breaks=c("cos", "edit"),
+                         labels=c("Cos", "Edit"))
+
+ggsave("scatter_scores.pdf", device = "pdf")
+
+```
+
+
+Two way ANOVA
+
+```{r}
+res.aov3 <- aov(value ~ variable * id, data = asm_val_g)
+summary(res.aov3)
+
+```
+
+```{r}
+plot(res.aov3, 1)
+library(car)
+leveneTest(value ~ variable * id, data = asm_val_g)
+
+```
+
+
+*Análisis de los tiempos cosine vs edit distance (con la muestra)*
+
+Análisis del tiempo de tokenizacion con n-grams de 8 a 10 y tokenización por palabras.
+
+```{r}
+# Rearranging the df
+t_ngrams$avg_total <- t_ngrams$avg_matrix + t_ngrams$avg_token
+t_ngram = melt(t_ngrams, id=c("ngram"))
+
+t_ngram_t = t_ngram[which(t_ngram$variable == "t_token"| t_ngram$variable == "t_matrix"),]
+t_ngram_avg = t_ngram[which(t_ngram$variable == "avg_token"| t_ngram$variable == "avg_matrix" | t_ngram$variable == "avg_total"),]
+t_ngram_per = t_ngram[which(t_ngram$variable == "per_token"| t_ngram$variable == "per_matrix"),]
+ 
+ggplot(t_ngram_t) + geom_line(aes(x=ngram, y=value, colour=variable))+ 
+  theme(panel.background = element_rect(fill = "white", colour = "grey50"), legend.position = c(0.08, 0.85), legend.background = element_rect(size=0.5, linetype="solid", 
+                                  colour ="black"),
+        axis.text=element_text(size=10),
+        axis.title=element_text(size=12))+
+  scale_colour_discrete(name="Phase",
+                         breaks=c("t_token", "t_matrix"),
+                         labels=c("Vector", "Matrix"))+
+  xlab('Number of n-grams') +
+  ylab('Time (s)')
+
+ggsave("t_ngrams.pdf", device = "pdf")
+
+ggplot(t_ngram_avg) + geom_line(aes(x=ngram, y=value, colour=variable))+ 
+  theme(panel.background = element_rect(fill = "white", colour = "grey50"), legend.position = c(0.08, 0.825), legend.background = element_rect(size=0.5, linetype="solid", 
+                                  colour ="black"),
+        axis.text=element_text(size=10),
+        axis.title=element_text(size=12))+
+  scale_colour_discrete(name="Phase",
+                         breaks=c("avg_token", "avg_matrix", "avg_total"),
+                         labels=c("Vector", "Matrix", "Total"))+
+  xlab('Number of n-grams') +
+  ylab('Time (s)')+
+    scale_x_continuous(breaks=c(1,2,3,4,5,6,7,8,9,10))
+
+ggsave("avg_ngrams.pdf", device = "pdf")
+
+ggplot(t_ngram_per) + geom_line(aes(x=ngram, y=value, colour=variable))+ 
+  theme(panel.background = element_rect(fill = "white", colour = "grey50"), legend.position = c(0.08, 0.85), legend.background = element_rect(size=0.5, linetype="solid", 
+                                  colour ="black"),
+        axis.text=element_text(size=10),
+        axis.title=element_text(size=12))+
+  scale_colour_discrete(name="Phase",
+                         breaks=c("per_token", "per_matrix"),
+                         labels=c("Vector", "Matrix"))+
+  xlab('Number of n-grams') +
+  ylab('Percentage in CS execution time') +
+    scale_x_continuous(breaks=c(1,2,3,4,5,6,7,8,9,10))+ 
+  scale_color_manual(values=c("#9400D3", "#2F4F4F"), name="Phase",
+                         breaks=c("per_token", "per_matrix"),
+                         labels=c("Vector", "Matrix"))
+
+ggsave("per_ngrams.pdf", device = "pdf")
+
+
+```
+
+Análisis de tiempo de ejecución vs numero de contratos del municipio (df_imun = 8)
+
+```{r}
+library(reshape2)
+#t_mun = t_mun[-nrow(t_mun),]
+t_munf <- t_mun[,1:3]
+t_munf <- t_munf[-nrow(t_munf),]
+t_muns <- melt(t_munf, id=c("X"))
+
+
+ggplot(t_muns) + geom_line(aes(x=X, y=value, colour=variable))+ 
+  theme(panel.background = element_rect(fill = "white", colour = "grey50"), legend.position = c(0.08, 0.825), legend.background = element_rect(size=0.5, linetype="solid", 
+                                  colour ="black"),
+        axis.text=element_text(size=10),
+        axis.title=element_text(size=12))+
+  xlab('Number of municipality contracts') +
+  ylab('Running time (s)')+ 
+  scale_color_manual(values=c("#9400D3", "#2F4F4F"), name="Phase",
+                         breaks=c("token_time", "matrix_time"),
+                         labels=c("Vector", "Matrix"))
+
+ggsave("time_muns.pdf", device = "pdf")
+
+```
+
+Comparación de tiempo total aumentando numero de contratos con CS y LD.
+
+```{r}
+t_mun$total_time <- t_mun$token_time + t_mun$matrix_time + t_mun$table_time
+t_mun_e1 <- t_mun_e[-nrow(t_mun_e),]
+t_mun$edit_time <- t_mun_e1$edit_time
+
+t_mun_g <- t_mun[,c(1,5:6)]
+t_muns_g <- melt(t_mun_g, id=c("X"))
+
+ggplot(t_muns_g) + geom_line(aes(x=X, y=value, colour=variable))+ 
+  theme(panel.background = element_rect(fill = "white", colour = "grey50"), legend.position = c(0.08, 0.85), legend.background = element_rect(size=0.5, linetype="solid", 
+                                  colour ="black"),
+        axis.text=element_text(size=10),
+        axis.title=element_text(size=12))+
+  scale_colour_discrete(name="Method",
+                         breaks=c("total_time", "edit_time"),
+                         labels=c("CS", "LD"))+
+  xlab('Number of municipality contracts') +
+  ylab('Running time (s)')
+
+ggsave("total_time_muns.pdf", device = "pdf")
+
+
+```
+
+
+
+
+
+Heatmap y diagrama de dispersion de los puntajes de los primeros y segundos contratos para CS y LD.
+
+```{r}
+
+ggplot(cos_val, aes(x = score1, y = score2, fill = duplicado)) + geom_tile() + scale_fill_gradient(low = "white", high = "steelblue") + scale_x_discrete(expand = c(0, 0)) + scale_y_continuous(expand = c(0,0))
+
+
+```
+
+```{r}
+
+
+```
+
